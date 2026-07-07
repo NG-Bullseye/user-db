@@ -25,11 +25,7 @@ def main(argv):
         case ["profile"]:
             _out(core.get_profile())
         case ["profile", "set", field, value]:
-            try:
-                parsed = json.loads(value)
-            except json.JSONDecodeError:
-                parsed = value
-            _out(core.set_profile_field(field, parsed))
+            _out(core.set_profile_field(field, core.parse_value(value)))
         case ["sensor", "read", name]:
             _out(core.read_sensor(name))
         case ["sensor", "report", name, value]:

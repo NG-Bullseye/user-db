@@ -6,8 +6,6 @@ Software only: all personal data lives outside the repo in USER_DB_DIR
 """
 from __future__ import annotations
 
-import json
-
 from mcp.server.fastmcp import FastMCP
 
 import core
@@ -27,11 +25,7 @@ def profile_set(field: str, value: str) -> dict:
     """Set one profile field. `value` is parsed as JSON when possible
     (lists/numbers/null), otherwise stored as plain string. value="null"
     deletes the field. Returns the updated profile."""
-    try:
-        parsed = json.loads(value)
-    except json.JSONDecodeError:
-        parsed = value
-    return core.set_profile_field(field, parsed)
+    return core.set_profile_field(field, core.parse_value(value))
 
 
 @mcp.tool()

@@ -88,6 +88,14 @@ def get_config() -> dict:
     return _deep_merge(DEFAULT_CONFIG, _read_json(CONFIG_FILE, {}))
 
 
+def parse_value(value: str):
+    """Eingabewert aus CLI/MCP: JSON wenn möglich, sonst String."""
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError:
+        return value
+
+
 # ---- Profile ----------------------------------------------------------------
 def get_profile() -> dict:
     return _read_json(PROFILE_FILE, {})
