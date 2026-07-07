@@ -38,3 +38,17 @@ definable curve in `config.json` maps stress → target room intensity;
 `state_get` returns `target` and `delta`. A positive delta means the room is
 more intense than the user's stress level calls for — the hook for later
 smart-home interactions.
+
+## The weekly protocol (SOLL)
+
+The interceptor executes a **weekly protocol**: a human-editable markdown file
+in the data directory (`$USER_DB_DIR/wochen-protokoll.md`, outside this repo)
+that describes 1:1 what the home is supposed to switch over the week (lights,
+music, projector, motion scenes, per weekday and time) plus the target room
+intensity per time window. The interceptor compares the live state against
+this protocol — effective target = min(time baseline, curve(stress)) — and
+raises an intervention request when reality diverges. Top-level behaviour
+changes are made by editing the protocol text; the underlying automation
+configs are then brought in line, never the other way around. A periodically
+written observation log (the watchdog's tracking files) is the IST counterpart
+for a future SOLL/IST weekly diff.
