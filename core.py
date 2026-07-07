@@ -136,7 +136,10 @@ def report_sensor(name: str, raw: float, now: float | None = None) -> dict:
     """
     cfg = _sensor_config(name)
     now = time.time() if now is None else now
-    raw = max(cfg["min"], min(cfg["max"], float(raw)))
+    raw = float(raw)
+    if math.isnan(raw):
+        raise ValueError(f"NaN observation for sensor {name!r}")
+    raw = max(cfg["min"], min(cfg["max"], raw))
     with _locked():
         state = _read_json(STATE_FILE, {})
         prev = state.get(name)
