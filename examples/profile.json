@@ -1,0 +1,9 @@
+{
+  "name": "Jane Doe",
+  "speech_id": "jane",
+  "birthday": "--01-31",
+  "relationship_status": null,
+  "profession": "Example profession",
+  "expertise": ["example field 1", "example field 2"],
+  "traits": ["example durable trait, e.g. ADHD"]
+}

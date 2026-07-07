@@ -1,0 +1,46 @@
+#!/usr/bin/env python3
+"""userdb CLI — same core as the MCP server, for shell loops / Home Assistant.
+
+  userdb profile                        print profile
+  userdb profile set <field> <value>    set field (value parsed as JSON if possible)
+  userdb sensor read <name>             read smoothed sensor
+  userdb sensor report <name> <value>   report raw observation (smoothed write)
+  userdb state                          all sensors + curve
+"""
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+import core  # noqa: E402
+
+
+def _out(data):
+    print(json.dumps(data, indent=2, ensure_ascii=False))
+
+
+def main(argv):
+    cmd = argv[1:] or ["state"]
+    match cmd:
+        case ["profile"]:
+            _out(core.get_profile())
+        case ["profile", "set", field, value]:
+            try:
+                parsed = json.loads(value)
+            except json.JSONDecodeError:
+                parsed = value
+            _out(core.set_profile_field(field, parsed))
+        case ["sensor", "read", name]:
+            _out(core.read_sensor(name))
+        case ["sensor", "report", name, value]:
+            _out(core.report_sensor(name, float(value)))
+        case ["state"]:
+            _out(core.get_state())
+        case _:
+            print(__doc__.strip(), file=sys.stderr)
+            return 2
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

@@ -1,0 +1,11 @@
+{
+  "sensors": {
+    "stress": { "min": 0, "max": 100, "tau_seconds": 600 },
+    "room_intensity": { "min": 0, "max": 100, "tau_seconds": 120 }
+  },
+  "curve": {
+    "x": "stress",
+    "y": "room_intensity",
+    "points": [[0, 85], [40, 60], [70, 35], [100, 15]]
+  }
+}

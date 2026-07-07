@@ -1,0 +1,7 @@
+[project]
+name = "user-db"
+version = "0.1.0"
+description = "Central user-state MCP server: profile + live virtual sensors (stress, room intensity) with configurable smoothing"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = ["mcp"]
