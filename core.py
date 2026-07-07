@@ -36,6 +36,10 @@ DEFAULT_CONFIG = {
         # smoothing. Small = reactive, large = inert.
         "stress": {"min": 0, "max": 100, "tau_seconds": 600},
         "room_intensity": {"min": 0, "max": 100, "tau_seconds": 120},
+        # Binary user presence (0/1) — effectively unsmoothed (tau→0) so
+        # leaving/arriving is anchored in the profile immediately. Reported
+        # by the room-intensity daemon from the house's person tracking.
+        "at_home": {"min": 0, "max": 1, "tau_seconds": 1},
     },
     # Piecewise-linear curve mapping the x-sensor to a *target* value for
     # the y-sensor. Default: the more stressed the user, the calmer the
