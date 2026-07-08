@@ -1,0 +1,190 @@
+#!/usr/bin/env python3
+"""kalib — textuelle Kalibrierung des neuronalen Interceptors (Manager-Werkzeug).
+
+Leo gibt dem Manager Feedback zu neuronalen Entscheidungen; der Manager
+übersetzt es hiermit in die SOLL-Beschreibung, nie von Hand:
+
+  kalib add "<Direktive>" [--anlass "…"]     neue textuelle Direktive (K-NNN)
+  kalib list [--all]                          aktive (oder alle) Einträge
+  kalib done K-NNN [--grund "…"]              Eintrag auf ERLEDIGT setzen
+  kalib intensity                             Soll-Grundlinien-Tabelle zeigen
+  kalib intensity <tag> <HH:MM> <wert> [--anlass "…"]
+                                              Grundlinien-Fenster ändern/einfügen
+                                              (schreibt soll-intensity.json UND
+                                              dokumentiert als K-Eintrag — beide
+                                              Darstellungen, kein Drift)
+
+Dateien (USER_DB_DIR, Default ~/.config/user-db/):
+  kalibrierung.md      — textuelle Direktiven, Teil des SOLL, neural liest sie
+  soll-intensity.json  — Maschinen-SSOT der Grundlinie, Komparator liest pro Tick
+
+σ-frei: reine SOLL-Textpflege, kein Policy-Key, kein Lernpfad.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import sys
+from datetime import date
+from pathlib import Path
+
+USER_DB_DIR = Path(os.environ.get("USER_DB_DIR", "~/.config/user-db")).expanduser()
+KALIB_FILE = USER_DB_DIR / "kalibrierung.md"
+SOLL_FILE = USER_DB_DIR / "soll-intensity.json"
+
+DAYS = ("mo", "di", "mi", "do", "fr", "sa", "so")
+ENTRY_RE = re.compile(r"^## (K-\d{3}) · (AKTIV|ERLEDIGT) · (\d{4}-\d{2}-\d{2})", re.M)
+
+HEADER = """\
+# Neuronale Kalibrierung — textuelle Direktiven an den Interceptor
+
+> **Kontrakt (Leo 2026-07-08):** Diese Datei ist Teil des SOLL — der textuelle
+> Kalibrier-Kanal neben dem Wochen-Protokoll. Der **Manager** übersetzt Leos
+> Feedback zu neuronalen Entscheidungen in Einträge (NUR über die `kalib`-CLI
+> aus `~/repos/user-db/bin/`, nie von Hand). **Neural** liest die AKTIV-Einträge
+> vor jedem Eingriff als bindende Ergänzung zum Wochen-Protokoll — bei Konflikt
+> gewinnt die Kalibrierung (sie ist Leos jüngerer Wille). Stabilisierte
+> Kalibrierungen werden per Ticket in Protokoll/Configs eingearbeitet und hier
+> auf ERLEDIGT gesetzt. Intensitäts-Einträge sind bereits maschinell in
+> `soll-intensity.json` nachgezogen (macht die CLI atomar mit).
+"""
+
+
+def _read() -> str:
+    if not KALIB_FILE.exists():
+        return HEADER
+    return KALIB_FILE.read_text()
+
+
+def _write(text: str) -> None:
+    USER_DB_DIR.mkdir(parents=True, exist_ok=True)
+    tmp = KALIB_FILE.with_suffix(".md.tmp")
+    tmp.write_text(text)
+    tmp.replace(KALIB_FILE)
+
+
+def _next_id(text: str) -> str:
+    nums = [int(m.group(1)[2:]) for m in ENTRY_RE.finditer(text)]
+    return f"K-{(max(nums) + 1) if nums else 1:03d}"
+
+
+def _append_entry(direktive: str, anlass: str | None, wirkung: str | None = None) -> str:
+    text = _read()
+    kid = _next_id(text)
+    entry = f"\n## {kid} · AKTIV · {date.today().isoformat()}\n"
+    if anlass:
+        entry += f"**Anlass:** {anlass}\n"
+    entry += f"**Direktive:** {direktive}\n"
+    if wirkung:
+        entry += f"**Wirkung:** {wirkung}\n"
+    _write(text.rstrip("\n") + "\n" + entry)
+    return kid
+
+
+def cmd_add(args: argparse.Namespace) -> None:
+    kid = _append_entry(args.direktive, args.anlass)
+    print(f"{kid} AKTIV — neural liest den Eintrag beim nächsten Eingriffs-Check.")
+
+
+def cmd_list(args: argparse.Namespace) -> None:
+    text = _read()
+    blocks = re.split(r"(?=^## K-\d{3} · )", text, flags=re.M)[1:]
+    shown = 0
+    for block in blocks:
+        status = ENTRY_RE.match(block).group(2)
+        if status == "AKTIV" or args.all:
+            print(block.rstrip("\n") + "\n")
+            shown += 1
+    if not shown:
+        print("Keine aktiven Kalibrierungen." if not args.all else "Keine Einträge.")
+
+
+def cmd_done(args: argparse.Namespace) -> None:
+    text = _read()
+    kid = args.id.upper()
+    pattern = re.compile(rf"^## {kid} · AKTIV · ", re.M)
+    if not pattern.search(text):
+        sys.exit(f"{kid} nicht gefunden oder nicht AKTIV.")
+    text = pattern.sub(f"## {kid} · ERLEDIGT · ", text)
+    if args.grund:
+        # Grund-Zeile ans Ende des Eintrags-Blocks hängen
+        block_re = re.compile(rf"(^## {kid} · ERLEDIGT · .*?)(?=^## K-|\Z)", re.M | re.S)
+        text = block_re.sub(
+            lambda m: m.group(1).rstrip("\n")
+            + f"\n**Erledigt ({date.today().isoformat()}):** {args.grund}\n\n",
+            text,
+        )
+    _write(text)
+    print(f"{kid} ERLEDIGT.")
+
+
+def cmd_intensity(args: argparse.Namespace) -> None:
+    data = json.loads(SOLL_FILE.read_text())
+    days = data["days"]
+    if args.tag is None:  # nur anzeigen
+        for day in DAYS:
+            windows = " ".join(f"{s}={v}" for s, v in days.get(day, []))
+            print(f"{day}: {windows}")
+        return
+    tag = args.tag.lower()
+    if tag not in DAYS:
+        sys.exit(f"Unbekannter Tag '{tag}' — erwartet: {', '.join(DAYS)}")
+    if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", args.zeit):
+        sys.exit(f"Ungültige Zeit '{args.zeit}' — erwartet HH:MM.")
+    if not 0 <= args.wert <= 100:
+        sys.exit("Wert muss 0–100 sein.")
+    windows = days[tag]
+    old = next((v for s, v in windows if s == args.zeit), None)
+    if old is not None:
+        windows[:] = [[s, args.wert if s == args.zeit else v] for s, v in windows]
+        change = f"{tag} {args.zeit}: Grundlinie {old} → {args.wert}"
+    else:
+        windows.append([args.zeit, args.wert])
+        windows.sort(key=lambda w: w[0])
+        change = f"{tag} {args.zeit}: neues Fenster, Grundlinie {args.wert}"
+    tmp = SOLL_FILE.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+    tmp.replace(SOLL_FILE)
+    kid = _append_entry(
+        change, args.anlass,
+        wirkung="soll-intensity.json maschinell nachgezogen; Komparator liest pro Tick — wirkt sofort.",
+    )
+    print(f"{kid}: {change} — live (Komparator liest die JSON minütlich).")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(prog="kalib", description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    p_add = sub.add_parser("add", help="neue textuelle Direktive")
+    p_add.add_argument("direktive")
+    p_add.add_argument("--anlass", help="welche neuronale Entscheidung war schlecht (Leo-Feedback)")
+    p_add.set_defaults(func=cmd_add)
+
+    p_list = sub.add_parser("list", help="Einträge zeigen (Default: nur AKTIV)")
+    p_list.add_argument("--all", action="store_true")
+    p_list.set_defaults(func=cmd_list)
+
+    p_done = sub.add_parser("done", help="Eintrag auf ERLEDIGT setzen")
+    p_done.add_argument("id")
+    p_done.add_argument("--grund")
+    p_done.set_defaults(func=cmd_done)
+
+    p_int = sub.add_parser("intensity", help="Soll-Grundlinie zeigen/ändern")
+    p_int.add_argument("tag", nargs="?", help="mo|di|mi|do|fr|sa|so")
+    p_int.add_argument("zeit", nargs="?", help="HH:MM Fensterstart")
+    p_int.add_argument("wert", nargs="?", type=int, help="Grundlinie 0–100")
+    p_int.add_argument("--anlass")
+    p_int.set_defaults(func=cmd_intensity)
+
+    args = parser.parse_args()
+    if args.cmd == "intensity" and args.tag is not None and (args.zeit is None or args.wert is None):
+        parser.error("intensity braucht tag zeit wert (oder gar keine Argumente zum Anzeigen)")
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()
