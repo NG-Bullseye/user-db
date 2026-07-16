@@ -30,6 +30,21 @@ The exact scoring definition is intentionally open and will be refined later;
 the contract is only: **0 = silent/idle room, 100 = maximum intensity**, report
 raw observations and let user-db's smoothing produce the stable sensor.
 
+## Hotpath-Architektur (Policy-Cache; konsolidiert aus neural/CLAUDE.md, 2026-07-15)
+
+Die Neural-Instanz ist **nicht** im Hotpath. Der Hotpath ist deterministisch: cortex `gateway.py::NeuralInterceptorLayer` (2s-Budget, fail-open) → `cortex:neural:hold:req` → `~/repos/watchdog/daemon/neural_hold.py` (systemd, ~3ms) → `cortex:neural:hold:reply`. Der Responder konsultiert vor seinem `default_pass` den **Policy-Cache**:
+
+- Key: `cortex:neural:policy:<event>:<source>` (z.B. `cortex:neural:policy:SlotApplyEvent:SCHEDULER`)
+- Value: JSON `{"verdict": "pass"|"modify"|"block", "reason": "…", "actions": […]}`
+- **IMMER mit TTL schreiben** (`SET … EX <sekunden>`, Richtwert ≤ 3600) — Regeln verfallen, nichts gilt ewig
+- Invalides JSON / invalider verdict / fehlender Key → Responder antwortet `pass` (fail-open)
+
+Neural liest den req-Stream **read-only** (nie XDEL/XTRIM, nie den Cursor des Responders anfassen) über den `hold-req`-Monitor-Log (`~/.cache/neural/monitors/hold-req.log`) oder direkt via `docker exec cortex-redis redis-cli XREVRANGE cortex:neural:hold:req + - COUNT n`. Kontextquellen read-only: `summary`-Feld, `cortex:state.context_priming`, Cerebellum-Daten.
+
+## Raumintensitäts-Daemon (Implementierung; konsolidiert aus neural/CLAUDE.md, 2026-07-15)
+
+`daemon/room_intensity.py` im neural-Repo (systemd `neural-room-intensity.service`, Restart=always) bestimmt minütlich die **Raumintensität 0-100** aus der Raumszene (Musik+Volume, Beamer-Watt, PC-Watt, Zone; read-only aus `cortex:perception:head`) und meldet sie an die zentrale user-db (Glättung dort, s.o.). cortex spiegelt den geglätteten Wert als `sensor.user_db_room_intensity` in den Head zurück; der Watchdog wacht über die Frische (`user_state`-Block im Snapshot). Die Scoring-Verfeinerung (Szenen wie Kino: Bett+Beamer+PC-aus) gehört der Neural-Instanz — Szenen-Definition siehe oben (§ Scene recognition).
+
 ## Combining both axes
 
 The interceptor additionally reads the current stress level
