@@ -41,9 +41,9 @@ Die Neural-Instanz ist **nicht** im Hotpath. Der Hotpath ist deterministisch: co
 
 Neural liest den req-Stream **read-only** (nie XDEL/XTRIM, nie den Cursor des Responders anfassen) über den `hold-req`-Monitor-Log (`~/.cache/neural/monitors/hold-req.log`) oder direkt via `docker exec cortex-redis redis-cli XREVRANGE cortex:neural:hold:req + - COUNT n`. Kontextquellen read-only: `summary`-Feld, `cortex:state.context_priming`, Cerebellum-Daten.
 
-## Raumintensitäts-Daemon (Implementierung; konsolidiert aus neural/CLAUDE.md, 2026-07-15)
+## Raumintensität (Implementierung)
 
-`daemon/room_intensity.py` im neural-Repo (systemd `neural-room-intensity.service`, Restart=always) bestimmt minütlich die **Raumintensität 0-100** aus der Raumszene (Musik+Volume, Beamer-Watt, PC-Watt, Zone; read-only aus `cortex:perception:head`) und meldet sie an die zentrale user-db (Glättung dort, s.o.). cortex spiegelt den geglätteten Wert als `sensor.user_db_room_intensity` in den Head zurück; der Watchdog wacht über die Frische (`user_state`-Block im Snapshot). Die Scoring-Verfeinerung (Szenen wie Kino: Bett+Beamer+PC-aus) gehört der Neural-Instanz — Szenen-Definition siehe oben (§ Scene recognition).
+Der frühere Daemon `daemon/room_intensity.py` im neural-Repo (`neural-room-intensity.service`) ist retired (inactive seit 2026-09-07). Die **Raumintensität 0-100** berechnet cortex deterministisch in `~/cortex/perception.py` `check_room_intensity` (MB-577, alle 60 s aus `~/cortex/engine.py`, Normierung bei `ROOM_INTENSITY_REFERENCE`) und schreibt sie direkt in das Head-Feld `sensor.user_db_room_intensity` — ohne `sensor_report` an die user-db; `check_user_db_sensors()` überspringt `room_intensity` aus `state.json`.
 
 ## Combining both axes
 
