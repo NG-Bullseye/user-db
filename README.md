@@ -25,6 +25,8 @@ cp examples/*.json ~/.config/user-db/
 
 ## Install & run
 
+Setup in einem Schritt (idempotent, startet keinen Dienst): `bash bootstrap.sh`
+
 ```bash
 python3 -m venv .venv && .venv/bin/pip install mcp
 claude mcp add --scope user user-db -- $PWD/.venv/bin/python $PWD/server.py
