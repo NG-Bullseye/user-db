@@ -2,9 +2,13 @@
 
 ## Deep Modules — Rohbeobachtung → geglätteter Sensor → Kurve
 
+> Stand 2026-10-27 · geprüft gegen 01c4532
+
 Der Hauptflow nimmt Rohwerte (0–100) virtueller Sensoren entgegen, glättet sie zeitabhängig exponentiell und bewertet eine Kurve Stress → Soll-Raumintensität. Kern `core.py`, zwei Fassaden: `server.py` (MCP) und `bin/userdb` (CLI). Nutzdaten nur in `USER_DB_DIR`, nie im Repo. Jede Innenleben-Zelle ist datei:zeile und muss per grep -n treffen.
 
 ## Flow
+
+> Stand 2026-10-27 · geprüft gegen 01c4532
 
 **Sequenz** (`core.py:133 def report_sensor`)
 
@@ -26,9 +30,13 @@ Der Hauptflow nimmt Rohwerte (0–100) virtueller Sensoren entgegen, glättet si
 
 ## Schnittstellen
 
+> Stand 2026-10-27 · geprüft gegen 01c4532
+
 - Datenverzeichnis `USER_DB_DIR` (Default `~/.config/user-db`, `core.py:27 DATA_DIR`), Vorlagen in `examples/`.
 - Interceptor-Konzept: `docs/neuronal-interceptor.md`.
 
 ## Standard: Deep Modules + Flow
+
+> Stand 2026-10-27 · geprüft gegen 01c4532
 
 Kanon: `~/repos/speech-engine/ARCHITECTURE.md` § Standard (R1–R5).
